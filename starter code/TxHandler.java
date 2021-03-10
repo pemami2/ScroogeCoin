@@ -9,10 +9,11 @@ public class TxHandler {
 	 * utxoPool by using the UTXOPool(UTXOPool uPool) constructor.
 	 */
 	private UTXOPool utxoPool;
-	private HashSet<UTXO> claimedOutputs = new HashSet<UTXO>();
+	private HashSet<UTXO> claimedOutputs;
 
 	public TxHandler(UTXOPool utxoPool) {
 		this.utxoPool = new UTXOPool(utxoPool);
+		this.claimedOutputs = new HashSet<UTXO>();
 	}
 
 	/* Returns true if
@@ -27,7 +28,7 @@ public class TxHandler {
 
 	public boolean isValidTx(Transaction tx) {
 		ArrayList<Transaction.Input> myInputs = tx.getInputs();
-		HashSet<UTXO> claimedOutputs = new HashSet<UTXO>();
+		this.claimedOutputs.clear();
 		double inputSum = 0;
 		double outputSum = 0;
 
@@ -36,7 +37,8 @@ public class TxHandler {
 			Transaction.Input myInput = myInputs.get(i);
 			UTXO myUTXO = new UTXO( myInput.prevTxHash, myInput.outputIndex);
 
-			if ( this.utxoPool.contains(myUTXO) == false || claimedOutputs.contains(myUTXO) ){
+			// check for unspent output and double-spend attempt
+			if ( this.utxoPool.contains(myUTXO) == false || this.claimedOutputs.contains(myUTXO) ){
 				return false;
 			}
 
@@ -49,12 +51,11 @@ public class TxHandler {
 			inputSum += this.utxoPool.getTxOutput(myUTXO).value;
 
 			//avoid double-counting
-			claimedOutputs.add(myUTXO);
+			this.claimedOutputs.add(myUTXO);
 		}
 
 		//calculate total outputs
 		for ( int i = 0; i < tx.numOutputs(); i++){
-
 			double tempVal = tx.getOutput(i).value;
 
 			if (tx.getOutput(i).value >= 0){
@@ -63,7 +64,6 @@ public class TxHandler {
 			} else {
 				return false;
 			}
-
 		}
 
 		// ensure tx input and outputs are net-positive
@@ -71,8 +71,6 @@ public class TxHandler {
 			return false;
 		}
 
-		// remove tx inputs from UTXO pool
-		this.claimedOutputs = claimedOutputs;
 		return true;
 	}
 
@@ -86,7 +84,6 @@ public class TxHandler {
 
 		//iterate through transactions
 		for ( int i = 0; i < possibleTxs.length; i++){
-			this.claimedOutputs.clear();
 
 			if ( isValidTx(possibleTxs[i])){
 				ans.add(possibleTxs[i]);
@@ -101,12 +98,10 @@ public class TxHandler {
 					UTXO myUTXO = new UTXO(possibleTxs[i].getHash(), j);
 					this.utxoPool.addUTXO(myUTXO, possibleTxs[i].getOutput(j));
 				}
-
 			}
-
 		}
 
 		return ans.toArray( new Transaction[ans.size()]);
 	}
 
-}
+} 
